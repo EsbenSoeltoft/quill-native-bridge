@@ -41,10 +41,9 @@ class QuillNativeBridgeWindows extends QuillNativeBridgePlatform {
 
   // TODO: Might extract low-level implementation of the clipboard outside of this class
 
-  /// Refer to [Windows GetClipboardData() docs](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboarddata)
   @override
   Future<String?> getClipboardHtml() async {
-    if (OpenClipboard(NULL) == FALSE) {
+    if (OpenClipboard(HWND(nullptr)) == FALSE) {
       assert(
         false,
         'Unknown error while opening the clipboard. Error code: ${GetLastError()}',
@@ -65,7 +64,7 @@ class QuillNativeBridgeWindows extends QuillNativeBridgePlatform {
       }
 
       final clipboardDataHandle = GetClipboardData(htmlFormatId);
-      if (clipboardDataHandle == NULL) {
+      if (clipboardDataHandle.value.address == NULL) {
         assert(
           false,
           'Failed to get clipboard data. Error code: ${GetLastError()}',
@@ -73,9 +72,9 @@ class QuillNativeBridgeWindows extends QuillNativeBridgePlatform {
         return null;
       }
 
-      final clipboardDataPointer = Pointer.fromAddress(clipboardDataHandle);
-      final lockedMemoryPointer = GlobalLock(clipboardDataPointer);
-      if (lockedMemoryPointer == nullptr) {
+      final clipboardDataPointer = clipboardDataHandle.value;
+      final lockedMemoryPointer = GlobalLock(HGLOBAL(clipboardDataPointer));
+      if (lockedMemoryPointer.value == nullptr) {
         assert(
           false,
           'Failed to lock global memory. Error code: ${GetLastError()}',
@@ -84,8 +83,8 @@ class QuillNativeBridgeWindows extends QuillNativeBridgePlatform {
       }
 
       final windowsHtmlWithMetadata =
-          lockedMemoryPointer.cast<Utf8>().toDartString();
-      GlobalUnlock(clipboardDataPointer);
+          lockedMemoryPointer.value.cast<Utf8>().toDartString();
+      GlobalUnlock(HGLOBAL(clipboardDataPointer));
 
       // Strip comments/headers at the start of the HTML as they can cause
       // issues while parsing the HTML
@@ -102,7 +101,7 @@ class QuillNativeBridgeWindows extends QuillNativeBridgePlatform {
   /// Refer to [Windows SetClipboardData() docs](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setclipboarddata)
   @override
   Future<void> copyHtmlToClipboard(String html) async {
-    if (OpenClipboard(NULL) == FALSE) {
+    if (OpenClipboard(HWND(nullptr)) == FALSE) {
       assert(
         false,
         'Unknown error while opening the clipboard. Error code: ${GetLastError()}',
@@ -136,7 +135,7 @@ class QuillNativeBridgeWindows extends QuillNativeBridgePlatform {
       final htmlSize = (htmlPointer.length + 1) * unitSize;
 
       final clipboardMemoryHandle = GlobalAlloc(GMEM_MOVEABLE, htmlSize);
-      if (clipboardMemoryHandle == nullptr) {
+      if (clipboardMemoryHandle.value == nullptr) {
         assert(
           false,
           'Failed to allocate memory for the clipboard content. Error code: ${GetLastError()}',
@@ -144,9 +143,9 @@ class QuillNativeBridgeWindows extends QuillNativeBridgePlatform {
         return;
       }
 
-      final lockedMemoryPointer = GlobalLock(clipboardMemoryHandle);
-      if (lockedMemoryPointer == nullptr) {
-        GlobalFree(clipboardMemoryHandle);
+      final lockedMemoryPointer = GlobalLock(clipboardMemoryHandle.value);
+      if (lockedMemoryPointer.value == nullptr) {
+        GlobalFree(clipboardMemoryHandle.value);
         assert(
           false,
           'Failed to lock global memory. Error code: ${GetLastError()}',
@@ -154,7 +153,7 @@ class QuillNativeBridgeWindows extends QuillNativeBridgePlatform {
         return;
       }
 
-      final targetMemoryPointer = lockedMemoryPointer.cast<Uint8>();
+      final targetMemoryPointer = lockedMemoryPointer.value.cast<Uint8>();
 
       final sourcePointer = htmlPointer.cast<Uint8>();
 
@@ -170,11 +169,11 @@ class QuillNativeBridgeWindows extends QuillNativeBridgePlatform {
       // Should not call GlobalFree() when SetClipboardData() success
       // as the Windows clipboard takes ownership of the memory.
 
-      GlobalUnlock(clipboardMemoryHandle);
+      GlobalUnlock(clipboardMemoryHandle.value);
 
-      if (SetClipboardData(htmlFormatId, clipboardMemoryHandle.address) ==
-          NULL) {
-        GlobalFree(clipboardMemoryHandle);
+      if (SetClipboardData(htmlFormatId, HANDLE(clipboardMemoryHandle.value)).value ==
+          nullptr) {
+        GlobalFree(clipboardMemoryHandle.value);
         assert(
           false,
           'Failed to set the clipboard data: ${GetLastError()}',
@@ -219,10 +218,11 @@ class QuillNativeBridgeWindows extends QuillNativeBridgePlatform {
 
   @override
   Future<void> openGalleryApp() async {
-    final uriPtr = TEXT('ms-photos:');
+    final uriPtr = 'ms-photos:'.toNativeUtf16();
     final openPtr = 'open'.toNativeUtf16();
 
-    ShellExecute(NULL, openPtr, uriPtr, nullptr, nullptr, SW_SHOWNORMAL);
+    ShellExecute(HWND(nullptr), PCWSTR(openPtr), PCWSTR(uriPtr),
+        PCWSTR(nullptr), PCWSTR(nullptr), SW_SHOWNORMAL);
 
     free(uriPtr);
     free(openPtr);

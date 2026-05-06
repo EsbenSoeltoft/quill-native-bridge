@@ -1,3 +1,4 @@
+import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart';
 
 import '../quill_native_bridge_windows.dart';
@@ -18,14 +19,14 @@ extension ClipboardHtmlFormatExt on QuillNativeBridgeWindows {
   }
 
   int? _registerHtmlFormat() {
-    final htmlFormatPointer = TEXT(_kHtmlFormatName);
-    final htmlFormatId = RegisterClipboardFormat(htmlFormatPointer);
+    final htmlFormatPointer = _kHtmlFormatName.toNativeUtf16();
+    final htmlFormatId = RegisterClipboardFormat(PCWSTR(htmlFormatPointer));
     free(htmlFormatPointer);
 
-    if (htmlFormatId == NULL) {
+    if (htmlFormatId.value == NULL) {
       // When error occurs
       return null;
     }
-    return htmlFormatId;
+    return htmlFormatId.value;
   }
 }
